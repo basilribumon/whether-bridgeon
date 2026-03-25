@@ -1,90 +1,116 @@
-const API_KEY = 'YOUR_API_KEY_HERE';
-const body = document.body;
-const themeBtn = document.getElementById('theme-toggle');
-const searchBtn = document.getElementById('search-btn');
-const cityInput = document.getElementById('city-input');
-const loader = document.getElementById('loader');
-const weatherContent = document.getElementById('weather-content');
-const errorMsg = document.getElementById('error-msg');
-const favList = document.getElementById('fav-list');
-
+const API_KEY = 'd64ae7753197722c5947e1ee8246a2e0';
 let favorites = JSON.parse(localStorage.getItem('weatherFavs')) || [];
 
-// 1. Theme Toggle
-themeBtn.addEventListener('click', () => {
-    body.classList.toggle('light-theme');
-    themeBtn.innerText = body.classList.contains('light-theme') ? '🌙 Dark Mode' : '☀️ Light Mode';
+// --- 1. DEBOUNCED SEARCH (500ms) ---
+let debounceTimer;
+const cityInput = document.getElementById('city-input');
+
+cityInput.addEventListener('input', (e) => {
+    const city = e.target.value.trim();
+    clearTimeout(debounceTimer);
+    
+    // Only search if the user enters more than 2 characters
+    debounceTimer = setTimeout(() => {
+        if (city.length > 2) {
+            getWeather(city);
+        }
+    }, 500); 
 });
 
-// 2. Fetch Weather
-async function fetchWeather(city) {
-  if (!city) return;
+// --- 2. FETCH API + ASYNC/AWAIT ---
+async function getWeather(city) {
+    const loader = document.getElementById('loader');
+    const content = document.getElementById('weather-content');
+    const errorMsg = document.getElementById('error-msg');
 
-  try {
-    let res = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&units=metric&appid=${API_KEY}`);
-    let data = await res.json();
+    // UI Reset
+    loader.classList.remove('hidden');
+    content.classList.add('hidden');
+    errorMsg.classList.add('hidden');
 
-    updateUI(data);
-  } catch (err) {
-    console.log("Error fetching data");
-  }
+    try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`;
+        const response = await fetch(url);
+        
+        if (!response.ok) throw new Error("City not found");
+        
+        const data = await response.json();
+        
+        // As per your study requirements: Returning the specific data object
+        const weatherObj = {
+            city: data.name,
+            temp: Math.round(data.main.temp),
+            feelsLike: Math.round(data.main.feels_like),
+            description: data.weather[0].description,
+            humidity: data.main.humidity,
+            windSpeed: data.wind.speed
+        };
+
+        renderWeather(weatherObj);
+    } catch (err) {
+        errorMsg.innerText = err.message;
+        errorMsg.classList.remove('hidden');
+    } finally {
+        loader.classList.add('hidden');
+    }
 }
 
-function updateUI(data) {
-  document.getElementById('city-name').innerText = data.city.name;
-  document.getElementById('curr-temp').innerText = Math.round(data.list[0].main.temp) + "°C";
-  document.getElementById('curr-desc').innerText = data.list[0].weather[0].description;
+// --- 3. UI RENDERING ---
+function renderWeather(weather) {
+    const content = document.getElementById('weather-content');
+    content.classList.remove('hidden');
 
-  let container = document.getElementById('forecast-container');
-  container.innerHTML = "";
-
-  for (let i = 0; i < data.list.length; i += 8) {
-    let day = data.list[i];
-    let date = new Date(day.dt_txt).toLocaleDateString('en', { weekday: 'short' });
-
-    container.innerHTML += `
-      <div>
-        <p>${date}</p>
-        <p>${Math.round(day.main.temp)}°</p>
-      </div>
-    `;
-  }
+    document.getElementById('city-name').innerText = weather.city;
+    document.getElementById('curr-temp').innerText = `${weather.temp}°C`;
+    document.getElementById('curr-desc').innerText = 
+        `${weather.description} | Feels like ${weather.feelsLike}°C`;
+    
+    // Update Add to Favorite Button
+    const favBtn = document.getElementById('add-fav-btn');
+    favBtn.onclick = () => addFavorite(weather.city);
 }
-// 3. Favorites Logic
+
+// --- 4. FAVORITES SYSTEM (localStorage) ---
 function addFavorite(city) {
     if (!favorites.includes(city)) {
         favorites.push(city);
-        saveAndRender();
+        localStorage.setItem('weatherFavs', JSON.stringify(favorites));
+        renderFavoritesList();
     }
 }
 
-function removeFavorite(city) {
-    favorites = favorites.filter(c => c !== city);
-    saveAndRender();
-}
+function renderFavoritesList() {
+    const list = document.getElementById('fav-list');
+    list.innerHTML = ''; // Clear current list
 
-function saveAndRender() {
-    localStorage.setItem('weatherFavs', JSON.stringify(favorites));
-    renderFavorites();
-}
-
-function renderFavorites() {
-    favList.innerHTML = '';
     if (favorites.length === 0) {
-        favList.innerHTML = '<p id="no-fav-text">No favorites added yet.</p>';
+        list.innerHTML = '<p>No favorites added yet.</p>';
         return;
     }
+
     favorites.forEach(city => {
-        const tag = document.createElement('div');
-        tag.className = 'fav-tag';
-        tag.innerHTML = `
-            <span style="cursor:pointer">${city}</span>
-            <span style="cursor:pointer; font-weight:bold" onclick="removeFavorite('${city}')">×</span>
+        const item = document.createElement('div');
+        item.className = 'fav-tag';
+        item.innerHTML = `
+            <span onclick="getWeather('${city}')">${city}</span>
+            <button onclick="removeFavorite('${city}')">×</button>
         `;
-        tag.querySelector('span').onclick = () => fetchWeather(city);
-        favList.appendChild(tag);
+        list.appendChild(item);
     });
 }
 
-searchBtn.addEventListener('click', () => fetchWeather(cityInput.value));
-renderFavorites(); // Load on refresh
+window.removeFavorite = (city) => {
+    favorites = favorites.filter(fav => fav !== city);
+    localStorage.setItem('weatherFavs', JSON.stringify(favorites));
+    renderFavoritesList();
+};
+
+// --- 5. THEME TOGGLE ---
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    document.body.classList.toggle('light-theme');
+    const isLight = document.body.classList.contains('light-theme');
+    document.getElementById('theme-toggle').innerText = isLight ? '🌙 Dark Mode' : '☀️ Light Mode';
+});
+
+// Load favorites on page refresh
+renderFavoritesList();
