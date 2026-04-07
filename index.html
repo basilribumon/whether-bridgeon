@@ -1,187 +1,33 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Weather Dashboard</title>
-<style>
-/* Interns: Add your CSS here */
-* { margin: 0; padding: 0; box-sizing: border-box; }
-
-:root {
-    --bg: #f0f2f5;
-    --card-bg: #ffffff;
-    --text: #1a1a1a;
-    --primary: #007bff;
-    --secondary: #6c757d;
-}
-
-body.dark-mode {
-    --bg: #18191a;
-    --card-bg: #242526;
-    --text: #e4e6eb;
-    --primary: #4599ff;
-}
-
-body { 
-    font-family: 'Segoe UI', Arial, sans-serif; 
-    background: var(--bg); 
-    color: var(--text);
-    transition: all 0.3s ease;
-}
-
-.container { max-width: 600px; margin: 40px auto; padding: 20px; }
-
-.theme-toggle { text-align: right; margin-bottom: 20px; }
-
-.search-section { display: flex; gap: 10px; margin-bottom: 20px; }
-
-input { 
-    flex: 1; padding: 12px; border-radius: 8px; border: 1px solid #ccc; 
-    background: var(--card-bg); color: var(--text);
-}
-
-button { 
-    padding: 10px 20px; cursor: pointer; border-radius: 8px; border: none; 
-    background: var(--primary); color: white; font-weight: bold;
-}
-
-.weather-card { 
-    background: var(--card-bg); padding: 25px; border-radius: 12px; 
-    box-shadow: 0 4px 12px rgba(0,0,0,0.1); margin-bottom: 20px;
-}
-
-.error { color: #dc3545; padding: 10px; margin-bottom: 20px; }
-
-.favorites-section { margin-top: 30px; }
-
-#favoritesList { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-
-.fav-btn { background: var(--secondary); font-size: 0.9rem; padding: 5px 12px; }
-
-.add-fav-btn { margin-top: 15px; background: #28a745; width: 100%; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Dashboard</title>
+    <link rel="stylesheet" href="index.css">
 </head>
 <body>
 
-<div class="container">
-    <div class="theme-toggle">
-        <button id="themeBtn">🌙 Dark</button>
+    <div class="container">
+        <div class="theme-toggle">
+            <button id="themeBtn">🌙 Dark</button>
+        </div>
+
+        <div class="search-section">
+            <input type="text" id="cityInput" placeholder="Enter city name..." />
+            <button id="searchBtn">Search Weather</button>
+        </div>
+
+        <div id="weatherCard" class="weather-card" style="display: none;"></div>
+
+        <div id="errorMsg" class="error" style="display: none;"></div>
+
+        <div class="favorites-section">
+            <h3>Favorites</h3>
+            <div id="favoritesList"></div>
+        </div>
     </div>
 
-    <div class="search-section">
-        <input type="text" id="cityInput" placeholder="Enter city name..." />
-        <button id="searchBtn">Search Weather</button>
-    </div>
-
-    <div id="weatherCard" class="weather-card" style="display: none;"></div>
-
-    <div id="errorMsg" class="error" style="display: none;"></div>
-
-    <div class="favorites-section">
-        <h3>Favorites</h3>
-        <div id="favoritesList"></div>
-    </div>
-</div>
-
-<script>
-// REPLACE THIS with your OpenWeatherMap API key
-const API_KEY = 'd64ae7753197722c5947e1ee8246a2e0';
-
-// 1. IMPLEMENT getWeather(city) - Fetch API + async/await
-async function getWeather(city) {
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${API_KEY}`;
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("City not found");
-    return await response.json();
-}
-
-// 2. IMPLEMENT addFavorite(city)
-async function addFavorite(city) {
-    // // localStorage + check duplicates
-    let favs = JSON.parse(localStorage.getItem('weatherFavs')) || [];
-    if (!favs.includes(city)) {
-        favs.push(city);
-        localStorage.setItem('weatherFavs', JSON.stringify(favs));
-        loadFavorites();
-    }
-}
-
-// 3. IMPLEMENT loadFavorites()
-function loadFavorites() {
-    // // Display favorites from localStorage
-    const list = document.getElementById('favoritesList');
-    const favs = JSON.parse(localStorage.getItem('weatherFavs')) || [];
-    list.innerHTML = favs.length ? '' : 'No favorites yet.';
-    
-    favs.forEach(city => {
-        const btn = document.createElement('button');
-        btn.className = 'fav-btn';
-        btn.textContent = city;
-        btn.onclick = () => searchWeather(city);
-        list.appendChild(btn);
-    });
-}
-
-// 4. IMPLEMENT searchWeather()
-async function searchWeather(city) {
-    // // Show loading, call getWeather, handle errors
-    const card = document.getElementById('weatherCard');
-    const error = document.getElementById('errorMsg');
-    
-    error.style.display = 'none';
-    card.style.display = 'block';
-    card.innerHTML = "Loading...";
-
-    try {
-        const data = await getWeather(city);
-        card.innerHTML = `
-            <h2>${data.name}</h2>
-            <p>Temperature: ${data.main.temp}°C</p>
-            <p>Weather: ${data.weather[0].main}</p>
-            <button class="add-fav-btn" onclick="addFavorite('${data.name}')">⭐ Add to Favorites</button>
-        `;
-    } catch (err) {
-        card.style.display = 'none';
-        error.textContent = err.message;
-        error.style.display = 'block';
-    }
-}
-
-// 5. IMPLEMENT debounceSearch()
-let debounceTimer;
-function debounceSearch(city) {
-    // // 500ms delay for search input
-    clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-        if (city) searchWeather(city);
-    }, 500);
-}
-
-// 6. Event Listeners (wire up buttons/inputs)
-document.addEventListener('DOMContentLoaded', function() {
-    const searchBtn = document.getElementById('searchBtn');
-    const cityInput = document.getElementById('cityInput');
-    const themeBtn = document.getElementById('themeBtn');
-
-    // // Search button click
-    searchBtn.onclick = () => searchWeather(cityInput.value);
-
-    // // Enter key listener
-    cityInput.onkeypress = (e) => { if (e.key === 'Enter') searchWeather(cityInput.value); };
-
-    // // Theme Toggle listener
-    themeBtn.onclick = () => {
-        document.body.classList.toggle('dark-mode');
-        themeBtn.textContent = document.body.classList.contains('dark-mode') ? '☀️ Light' : '🌙 Dark';
-    };
-
-    loadFavorites();
-});
-
-// Export functions for button onclick (temporary)
-window.searchWeather = searchWeather;
-window.addFavorite = addFavorite;
-</script>
+    <script src="index.js"></script>
 </body>
 </html>
